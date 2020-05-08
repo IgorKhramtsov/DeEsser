@@ -1,0 +1,6 @@
+[submodule "lib/libsoundio"]
+	path = lib/libsoundio
+	url = git@github.com:andrewrk/libsoundio
+[submodule "lib/nanogui"]
+	path = lib/nanogui
+	url = git@github.com:mitsuba-renderer/nanogui
