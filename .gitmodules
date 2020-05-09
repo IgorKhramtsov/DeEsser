@@ -4,3 +4,6 @@
 [submodule "lib/nanogui"]
 	path = lib/nanogui
 	url = git@github.com:mitsuba-renderer/nanogui
+[submodule "lib/fmt"]
+	path = lib/fmt
+	url = git@github.com:fmtlib/fmt
