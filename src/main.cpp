@@ -6,10 +6,12 @@
 #include <memory>
 #include <iostream>
 #include <soundio/soundio.h>
+#include "WaveShader.h"
 
 #define showGUI 1
 
 static std::unique_ptr<Area[]> channels;
+static WaveFormCanvas *wave_canvas = nullptr;
 
 static void write_callback(int num_samples, int num_areas, Area* areas) 
 {
@@ -57,6 +59,13 @@ void playfile(const char *filename)
     channels[i] = Area(f_data + i, num_samples + i, num_channels);
   }
 
+    // auto wave_form = new WaveFormCanvas(screen, channels.get());
+    // wave_form->set_position({0, 200});
+    // wave_form->set_background_color({100, 0, 100, 255});
+    // wave_form->set_fixed_size({10, 10});
+    // wave_canvas = wave_form;
+    wave_canvas->setArea(channels.get());
+
   init_audio_client(sample_rate, [](int, int, Area*){}, write_callback);
 }
 
@@ -64,25 +73,24 @@ void playfile(const char *filename)
 
 int main(int argc, char** argv) {
   
-  playfile("assets/rhodes.ogg");
-
 #if showGUI
   nanogui::init();
   {
     using namespace nanogui;
 
-    Screen screen(Vector2i(600, 480), "DeEsser");
-    // Window *window = new Window(screen, "Button demo");
-    // window->set_size(Vector2i(200, 100));
+    nanogui::ref<nanogui::Screen> screen = new Screen(Vector2i(600, 480), "DeEsser");
+    screen->set_background({100,100,100,255});
 
-    auto b = new Button(&screen, "but");
-    auto g = new Graph(&screen);
-    g->set_values(std::vector<float> {1.0f,2.0f,4.0f,5.0f,6.0f,7.0f,8.0f,2.0f,10});
-    g->set_position(Vector2i(100,100));
+    auto wave_form = new WaveFormCanvas(screen, nullptr);
+    wave_form->set_position({0, 0});
+    wave_form->set_background_color({100, 100, 100, 255});
+    wave_form->set_fixed_size({600, 00});
+    wave_canvas = wave_form;
 
-    screen.set_visible(true);
-    screen.perform_layout();
-    // window->center();
+    screen->set_visible(true);
+    screen->perform_layout();
+
+    playfile("assets/rhodes.ogg");
 
     mainloop(1 / 60.f * 1000);
   }
