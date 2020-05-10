@@ -14,10 +14,14 @@ public:
             return;
         setArea(area_);
     }
+
+    void set_progress(int n) {
+        progress = count - n;
+        // fmt::print("progres: {}\n", progress);
+    }
     void setArea(Area *area_) {
-        setting = true;
         using namespace nanogui;
-        count = (area_->end - area_->ptr) / area_->step;
+        count = (area_->end - area_->ptr);
         m_shader = new Shader(
             render_pass(),
 
@@ -50,14 +54,15 @@ public:
         constexpr int pos_size = 3;
         float *positions = new float[pos_size * 2 * count];
         constexpr int col_size = 3;
-        float *colors = new float[col_size * 2 * count];
-        float color[col_size * 2 * 1] = {1, 0, 0, 0, 1, 0};
+        colors = new float[col_size * 2 * count];
+        float color[col_size * 2 * 1] = {1, 0, 0, 1, 0, 0};
+        wave = area_;
         Area area = *area_;
         
 
         float step = 2.f / count;
         int i = 0;
-        while(area.ptr < area.end && i * 6 < pos_size * 2 * count) {
+        while(area.ptr < area.end && i < count) {
             float val = *(area.ptr++);
             int index = i * 6;
             *(positions + index + 0) = -1 + step * i;
@@ -70,33 +75,46 @@ public:
             memcpy((void*)(colors + index), (void*)&color, 6*sizeof(float));
             ++i;
         }
+        fmt::print("zalupa: {}, zalupa2: {}\n", area.ptr == area.end, count);
 
         m_shader->set_buffer("position", VariableType::Float32, {(size_t)2 * count, pos_size}, positions);
         m_shader->set_buffer("color", VariableType::Float32, {(size_t)2 * count, col_size}, colors);
-        setting = false;
     }
     virtual void draw_contents() override {
-        if(setting || m_shader==nullptr) return;
+        if(m_shader == nullptr || wave == nullptr) return;
 
         using namespace nanogui;
 
+        // all variables in theese three matrix are just picking
         Matrix4f view = Matrix4f::look_at(
             Vector3f(0, 0, zoom),
             Vector3f(posx, 0, 0),
             Vector3f(0, 1, 0)
         );
 
-        Matrix4f model2 = Matrix4f::rotate(
-            Vector3f(1, 0, 0),
-            m_rotation
-        );
-
         Matrix4f proj = Matrix4f::perspective(
             float(25 * Pi / 180),
             0.00001f,
             50.f,
-            (m_size.x() / (float) m_size.y()) * std::max(posy, 0.00001f) //* (zoom) * (zoom) // or zoom * 0.01
+            (m_size.x() / (float) m_size.y()) * std::max(posy, 0.00001f) 
         );
+
+        constexpr int col_size = 3;
+        Area area = *wave;
+
+        float step = 1.5f / count;
+        int i = 0;
+        float color1[col_size * 2 * 1] = {1, 0, 0, 1, 0, 0};
+        float color2[col_size * 2 * 1] = {0, 1, 0, 0, 1, 0};
+        while(i * 6 < col_size * 2 * progress) {
+            int index = i * 6;
+
+            memcpy((void*)(colors + index), (void*)&color2, 6*sizeof(float));
+            ++i;
+        }
+
+        m_shader->set_buffer("color", VariableType::Float32, {(size_t)2 * count, col_size}, colors);
+        
 
         Matrix4f mvp = proj * view;
 
@@ -168,13 +186,15 @@ private:
     float m_rotation;
     Area *wave = nullptr;
     int count;
-    bool setting = false;
-    float zoom = 0.1f;
+    int progress;
+    float *colors;
+
+    float zoom = 9.f;
     float zoomFactor = 0.9f;
     float posx = 0.f;
     float posx_down = 0.f;
 
-    float posy = 0.001f;
+    float posy = 0.164f;
     float posy_down = 0.f;
     bool drag = false;
     float m_mouse_down_pos_x;

@@ -4,11 +4,12 @@ struct Area {
     float* ptr;
     float* end;
     int step;
+    float* start;
 
     Area()
         : ptr(nullptr), end(nullptr), step(0) {}
     Area(float *ptr, int num_samples, int step)
-        : ptr(ptr), end(ptr + num_samples * step), step(step) {}
+        : ptr(ptr), end(ptr + num_samples * step), step(step), start(ptr) {}
 
     float& operator*() const {
         return *ptr;

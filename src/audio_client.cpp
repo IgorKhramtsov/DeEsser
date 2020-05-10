@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <memory>
+#include <algorithm>
 
 static struct SoundIo* soundio;
 static struct SoundIoDevice* indevice;
@@ -156,6 +157,10 @@ static void write_callback(SoundIoOutStream *outstream, int frame_count_min, int
     int err;
 
     int frames_left = frame_count_max;
+    int preferred_buffer = 4096;
+    if(frame_count_max > preferred_buffer && frame_count_min != frame_count_max)
+        frames_left = std::max(preferred_buffer, frame_count_min);
+
 
     for (;;) {
         int frame_count = frames_left;
@@ -244,6 +249,7 @@ int init_audio_client(int sample_rate, ReadCallback read_callback_, WriteCallbac
 
     char *stream_name = NULL;
     double latency = (double)BUFFER_SIZE / sample_rate;
+    fprintf(stderr, "Asked latency %f\n", latency);
 
     soundio = soundio_create();
     if (!soundio) {
@@ -381,7 +387,7 @@ int init_audio_client(int sample_rate, ReadCallback read_callback_, WriteCallbac
             fprintf(stderr, "unable to open device: %s", soundio_strerror(err));
         }
 
-        fprintf(stderr, "Input software latency: %f\n", outstream->software_latency);
+        fprintf(stderr, "Output software latency: %f\n", outstream->software_latency);
 
         if (outstream->layout_error) {
             fprintf(stderr, "unable to set channel layout: %s\n", soundio_strerror(outstream->layout_error));
