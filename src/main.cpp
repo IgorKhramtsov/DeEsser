@@ -71,14 +71,17 @@ int main(int argc, char** argv) {
   {
     using namespace nanogui;
 
-    Screen *screen = new Screen(Vector2i(600, 480), "DeEsser");
+    Screen screen(Vector2i(600, 480), "DeEsser");
     // Window *window = new Window(screen, "Button demo");
     // window->set_size(Vector2i(200, 100));
 
-    auto b = new Button(screen, "but");
+    auto b = new Button(&screen, "but");
+    auto g = new Graph(&screen);
+    g->set_values(std::vector<float> {1.0f,2.0f,4.0f,5.0f,6.0f,7.0f,8.0f,2.0f,10});
+    g->set_position(Vector2i(100,100));
 
-    screen->set_visible(true);
-    screen->perform_layout();
+    screen.set_visible(true);
+    screen.perform_layout();
     // window->center();
 
     mainloop(1 / 60.f * 1000);
