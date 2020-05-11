@@ -26,6 +26,6 @@ make # your build command dependent on platform
  1. [X] Project initialization (cmake)
  2. [X] Loading and decoding ogg audio file from disk (stb_vorbis)
  3. [X] Streaming audio data to speakers through (libsoundio)
- 4. [ ] Rendering data like waveform, audio specs ... (nanogui)
+ 4. [X] Rendering data like waveform, audio specs, playback control (nanogui)
  5. [ ] Audio processing, filtering ...
  6. [ ] ...

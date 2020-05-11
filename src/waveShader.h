@@ -102,14 +102,16 @@ public:
         constexpr int col_size = 3;
         Area area = *wave;
 
-        float step = 1.5f / count;
         int i = 0;
         float color1[col_size * 2 * 1] = {1, 0, 0, 1, 0, 0};
         float color2[col_size * 2 * 1] = {0, 1, 0, 0, 1, 0};
-        while(i * 6 < col_size * 2 * progress) {
+        while(i * 6 < col_size * 2 * count) {
             int index = i * 6;
 
-            memcpy((void*)(colors + index), (void*)&color2, 6*sizeof(float));
+            if(i * 6 < col_size * 2 * progress)
+                memcpy((void*)(colors + index), (void*)&color2, 6*sizeof(float));
+            else
+                memcpy((void*)(colors + index), (void*)&color1, 6*sizeof(float));
             ++i;
         }
 
