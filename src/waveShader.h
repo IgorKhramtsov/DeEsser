@@ -17,11 +17,11 @@ public:
 
     void set_progress(int n) {
         progress = count - n;
-        // fmt::print("progres: {}\n", progress);
     }
+
     void setArea(Area *area_) {
         using namespace nanogui;
-        count = (area_->end - area_->ptr);
+        count = (area_->end - area_->ptr) / area_->step;
         m_shader = new Shader(
             render_pass(),
 
@@ -63,7 +63,7 @@ public:
         float step = 2.f / count;
         int i = 0;
         while(area.ptr < area.end && i < count) {
-            float val = *(area.ptr++);
+            float val = *(area++);
             int index = i * 6;
             *(positions + index + 0) = -1 + step * i;
             *(positions + index + 1) = 0.f;
@@ -75,11 +75,11 @@ public:
             memcpy((void*)(colors + index), (void*)&color, 6*sizeof(float));
             ++i;
         }
-        fmt::print("zalupa: {}, zalupa2: {}\n", area.ptr == area.end, count);
 
         m_shader->set_buffer("position", VariableType::Float32, {(size_t)2 * count, pos_size}, positions);
         m_shader->set_buffer("color", VariableType::Float32, {(size_t)2 * count, col_size}, colors);
     }
+    
     virtual void draw_contents() override {
         if(m_shader == nullptr || wave == nullptr) return;
 
@@ -103,15 +103,15 @@ public:
         Area area = *wave;
 
         int i = 0;
-        float color1[col_size * 2 * 1] = {1, 0, 0, 1, 0, 0};
-        float color2[col_size * 2 * 1] = {0, 1, 0, 0, 1, 0};
+        float color_bef[col_size * 2 * 1] = {1, 0, 0, 1, 0, 0};
+        float color_aft[col_size * 2 * 1] = {0, 1, 0, 0, 1, 0};
         while(i * 6 < col_size * 2 * count) {
             int index = i * 6;
 
             if(i * 6 < col_size * 2 * progress)
-                memcpy((void*)(colors + index), (void*)&color2, 6*sizeof(float));
+                memcpy((void*)(colors + index), (void*)&color_aft, 6*sizeof(float));
             else
-                memcpy((void*)(colors + index), (void*)&color1, 6*sizeof(float));
+                memcpy((void*)(colors + index), (void*)&color_bef, 6*sizeof(float));
             ++i;
         }
 
@@ -133,12 +133,10 @@ public:
                 zoomFactor = 0.5;
             else if(action == GLFW_RELEASE)
                 zoomFactor = 0.9;
-            fmt::print("zoomFactor: {}\n", zoomFactor);
         }
         if (key == GLFW_KEY_RIGHT_SHIFT ) {
             if(action == GLFW_PRESS)
                 posx += 0.1;
-            fmt::print("posx: {}\n", posx);
         }
         return true;
     }
@@ -179,7 +177,6 @@ virtual bool mouse_drag_event(const nanogui::Vector2i &p, const nanogui::Vector2
             zoom *= zoomFactor;
         else
             zoom /= zoomFactor;
-        fmt::print("zoom: {}\n", zoom);
         return true;
     }
 

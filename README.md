@@ -1,7 +1,7 @@
 DeEsser
 ====================
 
-Audio processing to get rid of excessive prominence of sibilant consonants.
+Audio processing for getting rid of excessive prominence of sibilant consonants.
 
 ## Build
 
