@@ -20,6 +20,7 @@ make # your build command dependent on platform
  - [libsoundio](https://github.com/andrewrk/libsoundio)
  - [fmt](https://github.com/fmtlib/fmt)
  - [stb_vorbis](http://nothings.org/stb_vorbis/)
+ - [vorbis + ogg](https://github.com/Iunusov/OGG-Vorbis-CMAKE)
 
  ## Progress
 
@@ -27,5 +28,6 @@ make # your build command dependent on platform
  2. [X] Loading and decoding ogg audio file from disk (stb_vorbis)
  3. [X] Streaming audio data to speakers through (libsoundio)
  4. [X] Rendering data like waveform, audio specs, playback control (nanogui)
- 5. [ ] Audio processing, filtering ...
- 6. [ ] ...
+ 5. [X] Audio processing, fft -> suppress frequencies -> ifft
+ 6. [ ] Some tuning? Gauss?
+ 7. [X] Saving to ogg file (vorbis + ogg codec)

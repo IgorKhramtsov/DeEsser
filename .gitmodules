@@ -7,3 +7,6 @@
 [submodule "lib/fmt"]
 	path = lib/fmt
 	url = git@github.com:fmtlib/fmt
+[submodule "lib/ogg-vorbis"]
+	path = lib/ogg-vorbis
+	url = git@github.com:Iunusov/OGG-Vorbis-CMAKE

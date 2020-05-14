@@ -3,7 +3,6 @@ project(DeEsser)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# libsoundio options
 set(BUILD_EXAMPLE_PROGRAMS OFF CACHE BOOL "Build example programs")
 set(BUILD_TESTS OFF CACHE BOOL "Build tests")
 set(BUILD_DYNAMIC_LIBS OFF CACHE BOOL "Build dynamic libs" FORCE)
@@ -16,14 +15,17 @@ add_subdirectory(lib/fmt)
 add_subdirectory(lib/nanogui)
 add_subdirectory(lib/libsoundio)
 
-add_executable(DeEsser ${SOURCES})
+add_subdirectory(lib/ogg-vorbis)
 
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/libsoundio/
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/ogg-vorbis/vorbis/include/
     ${CMAKE_CURRENT_SOURCE_DIR}/lib/nanogui/include/
     ${NANOGUI_EXTRA_INCS}
 )
+
+add_executable(DeEsser ${SOURCES})
 
 get_directory_property(LIBSOUNDIO_LIBS DIRECTORY lib/libsoundio DEFINITION LIBSOUNDIO_LIBS)
 set_property(TARGET glfw glfw_objects nanogui PROPERTY FOLDER "dependencies")
@@ -39,6 +41,7 @@ target_link_libraries(DeEsser
     libsoundio_static
     nanogui
     fmt::fmt
+    vorbis
     ${LIBSOUNDIO_LIBS}
     ${NANOGUI_EXTRA_LIBS}
 )

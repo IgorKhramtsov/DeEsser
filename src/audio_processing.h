@@ -1,12 +1,14 @@
 // 
 // https://rosettacode.org/wiki/Fast_Fourier_transform#C.2B.2B
 // 
+#pragma once
+
 
 #include <complex>
 #include <iostream>
 #include <valarray>
 
-const double PI = 3.141592653589793238460;
+constexpr double PI = 3.141592653589793238460;
  
 typedef std::complex<double> Complex;
 typedef std::valarray<Complex> CArray;

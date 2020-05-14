@@ -3,6 +3,16 @@
 #include <string>
 #include <fmt/core.h>
 #include <stb_vorbis.c>
+#include <vorbis/vorbisenc.h>
+#include <io.h>
+#include <fcntl.h>
+#include <iostream>
+#include <fstream>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include <memory>
 #include <iostream>
 #include <soundio/soundio.h>
@@ -49,11 +59,21 @@ void convert_short2float(short *data, float *f_data, int size)
     *f_data++ = (float)(*(start++)) / INT16_MAX;
   }
 }
+void convert_float2char(float *data, short *s_data, int size) 
+{
+  auto *start = data;
+  auto *end = data + size;
+  while(start < end) {
+    *s_data++ = (short)((*(start++)) * INT16_MAX);
+  }
+}
 
 // Transform 1 area (all samples from 1 channel) to spectr and back
 void process(Area in_data, Area out_data) 
 {
-  constexpr int buffer_size = 16384;
+  // constexpr int buffer_size = 16384;
+  constexpr int buffer_size = 4096;
+
 
   // fill out_data by buffer of buffer_size while have in_data
   while(in_data.ptr < in_data.end) {
@@ -70,6 +90,42 @@ void process(Area in_data, Area out_data)
     auto complex_arr = CArray(complex.get(), buffer_size);
 
     fft_opt(complex_arr);
+
+    // double minR = 1000000., maxR = -100000., minI = 100000., maxI = -10000.;
+    // for (int i = 0; i < buffer_size; ++i) {
+    //   minI = std::min(minI, complex_arr[i].imag());
+    //   maxI = std::max(maxI, complex_arr[i].imag());
+    //   minR = std::min(minR, complex_arr[i].real());
+    //   maxR = std::max(maxR, complex_arr[i].real());
+    // }
+    // fmt::print("minR = {}\n maxR = {}\n minI = {}\n maxI = {}\n", minR, maxR, minI, maxI);
+
+    // for (int i = 0; i < buffer_size; ++i) {
+    //   //two-sided spectrum P2
+    //   std::sqrt(std::pow(complex_arr[i].real(),2) + std::pow(complex_arr[i].imag(),2) / buffer_size);
+    // }
+    
+    float freq;
+    double coeff = 5.0;
+    for (int i = 0; i < buffer_size / 2; ++i) {
+      freq = 44100.0f * i / buffer_size;
+      //two-sided spectrum P2
+      if (freq < 6000)
+        continue;
+      if(freq > 12500)
+        coeff = 3.5;
+      else if(freq > 10000)
+        coeff = 10.0;
+      else
+        coeff = 5.0;
+
+      complex_arr[i]._Val[0] /= coeff;
+      complex_arr[i]._Val[1] /= coeff;
+
+      complex_arr[i + buffer_size / 2]._Val[0] /= coeff;
+      complex_arr[i + buffer_size / 2]._Val[1] /= coeff;
+    }
+
     ifft(complex_arr);
 
     // fill transformed data into out buffer
@@ -122,7 +178,139 @@ void loadfile(const char *filename)
   init_audio_client(sample_rate, [](int, int, Area*){}, write_callback);
 }
 
+void savefile() 
+{
+  ogg_stream_state os; /* take physical pages, weld into a logical
+                          stream of packets */
+  ogg_page         og; /* one Ogg bitstream page.  Vorbis packets are inside */
+  ogg_packet       op; /* one raw packet of data for decode */
+  vorbis_info      vi; // struct that stores all the static vorbis bitstream settings 
+  vorbis_comment   vc; /* struct that stores all the user comments */
 
+  vorbis_dsp_state vd; /* central working state for the packet->PCM decoder */
+  vorbis_block     vb; /* local working space for packet->PCM decode */
+
+  // std::ofstream out("assets/out.ogg");
+  FILE * out;
+  out = fopen("out.ogg", "wb");
+
+  vorbis_info_init(&vi);
+  int ret=vorbis_encode_init_vbr(&vi,2,44100,0.1f);
+  if(ret)
+    throw "cant save";
+
+  /* add a comment */
+  vorbis_comment_init(&vc);
+  vorbis_comment_add_tag(&vc,"ENCODER","encoder_example.c");
+
+  /* set up the analysis state and auxiliary encoding storage */
+  vorbis_analysis_init(&vd,&vi);
+  vorbis_block_init(&vd,&vb);
+
+  /* set up our packet->stream encoder */
+  /* pick a random serial number; that way we can more likely build
+     chained streams just by concatenation */
+  int eos = 0;
+  srand(time(NULL));
+  ogg_stream_init(&os,rand());
+
+  {
+    ogg_packet header;
+    ogg_packet header_comm;
+    ogg_packet header_code;
+
+    vorbis_analysis_headerout(&vd,&vc,&header,&header_comm,&header_code);
+    ogg_stream_packetin(&os,&header); /* automatically placed in its own
+                                         page */
+    ogg_stream_packetin(&os,&header_comm);
+    ogg_stream_packetin(&os,&header_code);
+
+    /* This ensures the actual
+     * audio data will start on a new page, as per spec
+     */
+    while(!eos){
+      int result=ogg_stream_flush(&os,&og);
+      if(result==0)break;
+      fwrite(og.header,1,og.header_len,out);
+      fwrite(og.body,1,og.body_len,out);
+    }
+
+  }
+
+  while(!eos){
+    long i;
+    // long bytes=fread(readbuffer,1,1024*4,stdin); /* stereo hardwired here */
+    long bytes = (channels_processed[0].end - channels_processed[0].ptr) / channels_processed[0].step;
+    bytes = std::min(bytes, 1024l);
+    
+
+    if(bytes==0){
+      /* end of file.  this can be done implicitly in the mainline,
+          but it's easier to see here in non-clever fashion.
+          Tell the library we're at end of stream so that it can handle
+          the last frame and mark end of stream in the output properly */
+      vorbis_analysis_wrote(&vd,0);
+
+    }else{
+      /* data to encode */
+
+      /* expose the buffer to submit data */
+      float **buffer=vorbis_analysis_buffer(&vd,1024);
+
+      /* uninterleave samples */
+      for(i=0;i<bytes;i++){
+        buffer[0][i] = (*channels_processed[0]++);
+        buffer[1][i] = (*channels_processed[1]++);
+        // buffer[0][i]=((readbuffer[i*4+1]<<8)|
+                      // (0x00ff&(int)readbuffer[i*4]))/32768.f;
+        // buffer[1][i]=((readbuffer[i*4+3]<<8)|
+        //               (0x00ff&(int)readbuffer[i*4+2]))/32768.f;
+      }
+
+      /* tell the library how much we actually submitted */
+      vorbis_analysis_wrote(&vd,i);
+    }
+      /* vorbis does some data preanalysis, then divvies up blocks for
+        more involved (potentially parallel) processing.  Get a single
+        block for encoding now */
+    while(vorbis_analysis_blockout(&vd,&vb)==1){
+
+      /* analysis, assume we want to use bitrate management */
+      vorbis_analysis(&vb,NULL);
+      vorbis_bitrate_addblock(&vb);
+
+      while(vorbis_bitrate_flushpacket(&vd,&op)){
+
+        /* weld the packet into the bitstream */
+        ogg_stream_packetin(&os,&op);
+
+        /* write out pages (if any) */
+        while(!eos){
+          int result=ogg_stream_pageout(&os,&og);
+          if(result==0)break;
+          fwrite(og.header,1,og.header_len,out);
+          fwrite(og.body,1,og.body_len,out);
+
+          /* this could be set above, but for illustrative purposes, I do
+              it here (to show that vorbis does know where the stream ends) */
+
+          if(ogg_page_eos(&og))eos=1;
+        }
+      }
+    }
+  }
+
+  /* clean up and exit.  vorbis_info_clear() must be called last */
+
+  ogg_stream_clear(&os);
+  vorbis_block_clear(&vb);
+  vorbis_dsp_clear(&vd);
+  vorbis_comment_clear(&vc);
+  vorbis_info_clear(&vi);
+
+  fmt::print("saved to file out.ogg\n");
+  std::fclose(out);
+}
 
 int main(int argc, char** argv) {
   
@@ -187,6 +375,7 @@ int main(int argc, char** argv) {
       for (int i = 0; i < channels[0].step; ++i)
         process(channels[i], channels_processed[i]);
       processed_canvas->setArea(channels_processed.get());
+      savefile();
     });
     auto b_play_s = new Button(second_layout, "Play");
     b_play_s->set_fixed_size({75, 30});
