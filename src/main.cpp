@@ -68,11 +68,53 @@ void convert_float2char(float *data, short *s_data, int size)
   }
 }
 
-// Transform 1 area (all samples from 1 channel) to spectr and back
+float getAvg(Area data) 
+{
+  float summ = 0.f;
+  int count = data.size() / 2;
+  while(data.ptr < data.end - 2) {
+    auto a = *data++;
+    auto b = *data++;
+    summ += std::abs(b - a);
+  }
+  return summ / count;
+}
+
+void filter(CArray &arr, int buffer_size) 
+{
+    float freq;
+    double coeff = -1.;
+    for (int i = 1; i < buffer_size / 2; ++i) {
+      freq = 44100.0f * i / buffer_size;
+      double thresh = 12500;
+      if (freq < thresh / 10)
+        coeff = 0.5;
+      else if (freq>=thresh)
+        coeff = 10 * thresh / freq;
+      else
+        coeff = 1 + 9 * std::pow(freq / thresh, 3);
+
+      arr[i]._Val[0] /= coeff;
+      arr[i]._Val[1] /= coeff;
+
+      arr[buffer_size - i]._Val[0] /= coeff;
+      arr[buffer_size - i]._Val[1] /= coeff;
+    }
+}
+
+// Transform 1 area (all samples from 1 channel) fft -> filter -> ifft
 void process(Area in_data, Area out_data) 
 {
   // constexpr int buffer_size = 16384;
   constexpr int buffer_size = 4096;
+  float avg = getAvg(in_data);
+  int c = 0; //test stuff to check more and less of avg ratio
+
+  
+  // TODO: Complex filter (thing we calculate by if`s in cycle) should be precalculate
+  //        and stored in memory
+  // TODO: Do something with transition between buffers (Overlap-save method)
+  //        NOT hanning window by the way, i tried it :]
 
 
   // fill out_data by buffer of buffer_size while have in_data
@@ -80,53 +122,32 @@ void process(Area in_data, Area out_data)
     auto complex = std::make_unique<Complex[]>(buffer_size);
     auto complex_it = complex.get();
     auto complex_end = complex.get() + buffer_size;
+    float summ = 0;
+    
+    int count = 0;
     while(complex_it < complex_end) {
       if (in_data.ptr < in_data.end)
         *(complex_it++) = *(in_data++);
       else // if in_data was not aliquot to buffer_size - fill with zeros
         *(complex_it++) = 0.;
+      count++;
+      if(count % 2 == 0)
+        summ += std::abs(complex[count].real() - complex[count-1].real());
     }
+    float loc_avg = summ / (count / 2);
 
     auto complex_arr = CArray(complex.get(), buffer_size);
 
-    fft_opt(complex_arr);
-
-    // double minR = 1000000., maxR = -100000., minI = 100000., maxI = -10000.;
-    // for (int i = 0; i < buffer_size; ++i) {
-    //   minI = std::min(minI, complex_arr[i].imag());
-    //   maxI = std::max(maxI, complex_arr[i].imag());
-    //   minR = std::min(minR, complex_arr[i].real());
-    //   maxR = std::max(maxR, complex_arr[i].real());
-    // }
-    // fmt::print("minR = {}\n maxR = {}\n minI = {}\n maxI = {}\n", minR, maxR, minI, maxI);
-
-    // for (int i = 0; i < buffer_size; ++i) {
-    //   //two-sided spectrum P2
-    //   std::sqrt(std::pow(complex_arr[i].real(),2) + std::pow(complex_arr[i].imag(),2) / buffer_size);
-    // }
-    
-    float freq;
-    double coeff = 5.0;
-    for (int i = 0; i < buffer_size / 2; ++i) {
-      freq = 44100.0f * i / buffer_size;
-      //two-sided spectrum P2
-      if (freq < 6000)
-        continue;
-      if(freq > 12500)
-        coeff = 3.5;
-      else if(freq > 10000)
-        coeff = 10.0;
-      else
-        coeff = 5.0;
-
-      complex_arr[i]._Val[0] /= coeff;
-      complex_arr[i]._Val[1] /= coeff;
-
-      complex_arr[i + buffer_size / 2]._Val[0] /= coeff;
-      complex_arr[i + buffer_size / 2]._Val[1] /= coeff;
+    if(loc_avg > avg){
+      c++;
+      fmt::print("more. loc: {}, avg: {}, dif: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
+      fft_opt(complex_arr);
+      filter(complex_arr, buffer_size);
+      ifft(complex_arr);
+    } else {
+      c--;
+      fmt::print("less. loc: {}, avg: {}, dif: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
     }
-
-    ifft(complex_arr);
 
     // fill transformed data into out buffer
     int i = 0;
@@ -134,6 +155,7 @@ void process(Area in_data, Area out_data)
         *(out_data++) = complex_arr[i++].real();
     }
   }
+  fmt::print("c: {}\n", c);
 }
 
 void loadfile(const char *filename) 
@@ -351,7 +373,7 @@ int main(int argc, char** argv) {
     auto b_load = new Button(first_layout, "Load");
     b_load->set_fixed_size({75, 30});
     b_load->set_callback([&] {
-        loadfile(file_dialog({ {"ogg", "Open GNU G"} }, false).c_str());
+        loadfile(file_dialog({ {"ogg", "Vorbis ogg"} }, false).c_str());
     });
     auto b_play = new Button(first_layout, "Play");
     b_play->set_fixed_size({75, 30});

@@ -67,4 +67,8 @@ struct Area {
         }
         return (int)((area_in.ptr - area_in_start) / area_in.step);
     }
+
+    int size() {
+        return (end - ptr) / step;
+    }
 };
