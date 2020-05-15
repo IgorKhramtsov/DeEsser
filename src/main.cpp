@@ -152,7 +152,7 @@ void process(Area in_data, Area out_data)
     // fill transformed data into out buffer
     int i = 0;
     while(out_data.ptr < out_data.end && i < buffer_size) {
-        *(out_data++) = complex_arr[i++].real();
+        *(out_data++) = static_cast<float>(complex_arr[i++].real());
     }
   }
   fmt::print("c: {}\n", c);
