@@ -6,7 +6,7 @@ Audio processing for getting rid of excessive prominence of sibilant consonants.
 ## Build
 
 ```
-git clone --recursive git@github.com:crataegus27/DeEsser
+git clone --recursive https://github.com/crataegus27/DeEsser.git
 cd DeEsser
 mkdir build
 cd build 

@@ -1,12 +1,12 @@
 [submodule "lib/libsoundio"]
 	path = lib/libsoundio
-	url = git@github.com:andrewrk/libsoundio
+	url = https://github.com/andrewrk/libsoundio.git
 [submodule "lib/nanogui"]
 	path = lib/nanogui
-	url = git@github.com:mitsuba-renderer/nanogui
+	url = https://github.com/mitsuba-renderer/nanogui.git
 [submodule "lib/fmt"]
 	path = lib/fmt
-	url = git@github.com:fmtlib/fmt
+	url = https://github.com/fmtlib/fmt.git
 [submodule "lib/ogg-vorbis"]
 	path = lib/ogg-vorbis
-	url = git@github.com:Iunusov/OGG-Vorbis-CMAKE
+	url = https://github.com/Iunusov/OGG-Vorbis-CMAKE.git
