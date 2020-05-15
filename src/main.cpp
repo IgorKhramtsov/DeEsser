@@ -84,7 +84,7 @@ void process(Area in_data, Area out_data)
       if (in_data.ptr < in_data.end)
         *(complex_it++) = *(in_data++);
       else // if in_data was not aliquot to buffer_size - fill with zeros
-        *(complex_it++) = 0.;
+        *(complex_it++) = 0.0;
     }
 
     auto complex_arr = CArray(complex.get(), buffer_size);
@@ -106,24 +106,22 @@ void process(Area in_data, Area out_data)
     // }
     
     float freq;
-    double coeff = 5.0;
-    for (int i = 0; i < buffer_size / 2; ++i) {
+    double coeff = 1;
+    complex_arr[0]._Val[0] /= coeff;
+    complex_arr[0]._Val[1] /= coeff;
+    for (int i = 1; i < buffer_size / 2; ++i) {
       freq = 44100.0f * i / buffer_size;
-      //two-sided spectrum P2
-      if (freq < 6000)
-        continue;
-      if(freq > 12500)
-        coeff = 3.5;
-      else if(freq > 10000)
-        coeff = 10.0;
-      else
-        coeff = 5.0;
+      double thresh = 12500.0;
+      if (freq >= thresh)
+        coeff = 10 * thresh / freq;
+      else if (freq >= thresh/10)
+        coeff = 1 + 9 * std::pow(freq / thresh, 3);
 
       complex_arr[i]._Val[0] /= coeff;
       complex_arr[i]._Val[1] /= coeff;
 
-      complex_arr[i + buffer_size / 2]._Val[0] /= coeff;
-      complex_arr[i + buffer_size / 2]._Val[1] /= coeff;
+      complex_arr[buffer_size - i]._Val[0] /= coeff;
+      complex_arr[buffer_size - i]._Val[1] /= coeff;
     }
 
     ifft(complex_arr);
@@ -131,7 +129,7 @@ void process(Area in_data, Area out_data)
     // fill transformed data into out buffer
     int i = 0;
     while(out_data.ptr < out_data.end && i < buffer_size) {
-        *(out_data++) = complex_arr[i++].real();
+        *(out_data++) = static_cast<float>(complex_arr[i++].real());
     }
   }
 }
