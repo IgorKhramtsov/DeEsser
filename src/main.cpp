@@ -80,6 +80,8 @@ float getAvg(Area data)
   return summ / count;
 }
 
+// TODO: Coefficients of this filter should be precalculated
+//        and stored in memory as array
 void filter(CArray &arr, int buffer_size) 
 {
     float freq;
@@ -102,29 +104,27 @@ void filter(CArray &arr, int buffer_size)
     }
 }
 
-// Transform 1 area (all samples from 1 channel) fft -> filter -> ifft
+/// Transform 1 area (all samples from 1 channel) fft -> filter -> ifft
+/// Probably we lose first 1/3 buffer size of input signal,
+///  can be solved by zeroing padding it from the begin
 void process(Area in_data, Area out_data) 
 {
-  // constexpr int buffer_size = 16384;
-  constexpr int buffer_size = 4096;
+  constexpr int buffer_size = 16384;
   float avg = getAvg(in_data);
   int c = 0; //test stuff to check more and less of avg ratio
 
-  
-  // TODO: Complex filter (thing we calculate by if`s in cycle) should be precalculate
-  //        and stored in memory
-  // TODO: Do something with transition between buffers (Overlap-save method)
-  //        NOT hanning window by the way, i tried it :]
-
-
   // fill out_data by buffer of buffer_size while have in_data
-  while(in_data.ptr < in_data.end) {
+  while(in_data.ptr < in_data.end + buffer_size / 2 && out_data.ptr != out_data.end) {
     auto complex = std::make_unique<Complex[]>(buffer_size);
     auto complex_it = complex.get();
     auto complex_end = complex.get() + buffer_size;
     float summ = 0;
-    
     int count = 0;
+
+    // Move window back to 2/3
+    if(in_data.ptr != in_data.start)
+      in_data -= ( 2 * buffer_size / 3);
+
     while(complex_it < complex_end) {
       if (in_data.ptr < in_data.end)
         *(complex_it++) = *(in_data++);
@@ -134,25 +134,25 @@ void process(Area in_data, Area out_data)
       if(count % 2 == 0)
         summ += std::abs(complex[count].real() - complex[count-1].real());
     }
+
     float loc_avg = summ / (count / 2);
-
     auto complex_arr = CArray(complex.get(), buffer_size);
-
-    if(loc_avg > avg){
+    if(loc_avg > avg) {
       c++;
-      fmt::print("more. loc: {}, avg: {}, dif: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
+      fmt::print("\tmore. thresh: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
       fft_opt(complex_arr);
       filter(complex_arr, buffer_size);
       ifft(complex_arr);
     } else {
       c--;
-      fmt::print("less. loc: {}, avg: {}, dif: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
+      fmt::print("less. thresh: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
     }
 
-    // fill transformed data into out buffer
+
+    // fill middle 1/3 of filtered data to output 
     int i = 0;
-    while(out_data.ptr < out_data.end && i < buffer_size) {
-        *(out_data++) = static_cast<float>(complex_arr[i++].real());
+    while(out_data.ptr < out_data.end && i < buffer_size / 3) {
+        *(out_data++) = (float)(complex_arr[buffer_size / 3 + i++].real());
     }
   }
   fmt::print("c: {}\n", c);
