@@ -28,6 +28,11 @@ static WaveFormCanvas *processed_canvas = nullptr;
 static nanogui::Label *audio_stats;
 static bool play_flag = false;
 static int played_track = 0;
+static float calculated_avg = -1.f;
+static float user_avg_thresh = 0.f;
+static inline float avg() { return calculated_avg + user_avg_thresh; }
+static float intensity = 10.f;
+static double target_freq = 12500;
 
 static void write_callback(int num_samples, int num_areas, Area* areas) 
 {
@@ -80,19 +85,33 @@ float getAvg(Area data)
   return summ / count;
 }
 
+float getAvgMoreCounts(Area data, float avg) 
+{
+  int count = 0;
+  while(data.ptr < data.end - 2) {
+    auto a = *data++;
+    auto b = *data++;
+    if (std::abs(b - a) > avg)
+      count++;
+  }
+  return count;
+}
+
+  // TODO: Complex filter (thing we calculate by if`s in cycle) should be precalculate
+  //        and stored in memory
 void filter(CArray &arr, int buffer_size) 
 {
     float freq;
     double coeff = -1.;
     for (int i = 1; i < buffer_size / 2; ++i) {
       freq = 44100.0f * i / buffer_size;
-      double thresh = 12500;
+      double thresh = target_freq;
       if (freq < thresh / 10)
         coeff = 0.5;
-      else if (freq>=thresh)
-        coeff = 10 * thresh / freq;
+      else if (freq >= thresh)
+        coeff = intensity * thresh / freq;
       else
-        coeff = 1 + 9 * std::pow(freq / thresh, 3);
+        coeff = 1 + (intensity - 1) * std::pow(freq / thresh, 3);
 
       arr[i]._Val[0] /= coeff;
       arr[i]._Val[1] /= coeff;
@@ -105,48 +124,43 @@ void filter(CArray &arr, int buffer_size)
 // Transform 1 area (all samples from 1 channel) fft -> filter -> ifft
 void process(Area in_data, Area out_data) 
 {
-  // constexpr int buffer_size = 16384;
-  constexpr int buffer_size = 4096;
-  float avg = getAvg(in_data);
-  int c = 0; //test stuff to check more and less of avg ratio
-
+  constexpr int buffer_size = 8192;
+  // float avg = getAvg(in_data);
+  float avg = ::avg();
   
-  // TODO: Complex filter (thing we calculate by if`s in cycle) should be precalculate
-  //        and stored in memory
-  // TODO: Do something with transition between buffers (Overlap-save method)
-  //        NOT hanning window by the way, i tried it :]
-
+  int c = 0; //test stuff to check more and less of avg ratio
 
   // fill out_data by buffer of buffer_size while have in_data
   while(in_data.ptr < in_data.end) {
     auto complex = std::make_unique<Complex[]>(buffer_size);
     auto complex_it = complex.get();
     auto complex_end = complex.get() + buffer_size;
-    float summ = 0;
+    bool loc_avg = false;
     
-    int count = 0;
+    if(in_data + buffer_size < in_data.end){
+      auto count_more = getAvgMoreCounts( Area(in_data.ptr, buffer_size, 2), avg );
+      if(count_more > 10)
+        loc_avg = true;
+    }
+
     while(complex_it < complex_end) {
       if (in_data.ptr < in_data.end)
         *(complex_it++) = *(in_data++);
       else // if in_data was not aliquot to buffer_size - fill with zeros
         *(complex_it++) = 0.;
-      count++;
-      if(count % 2 == 0)
-        summ += std::abs(complex[count].real() - complex[count-1].real());
     }
-    float loc_avg = summ / (count / 2);
 
     auto complex_arr = CArray(complex.get(), buffer_size);
 
-    if(loc_avg > avg){
+    if(loc_avg) {
       c++;
-      fmt::print("more. loc: {}, avg: {}, dif: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
+      // fmt::print("more. loc: {}, avg: {}, dif: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
       fft_opt(complex_arr);
       filter(complex_arr, buffer_size);
       ifft(complex_arr);
     } else {
       c--;
-      fmt::print("less. loc: {}, avg: {}, dif: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
+      // fmt::print("less. loc: {}, avg: {}, dif: {}\n", loc_avg, avg, std::abs(loc_avg - avg));
     }
 
     // fill transformed data into out buffer
@@ -189,6 +203,8 @@ void loadfile(const char *filename)
   for (int i = 0; i < num_channels; ++i) {
     channels[i] = Area(f_data + i, num_samples + i, num_channels);
   }
+  calculated_avg = getAvg(channels[0]);
+  wave_canvas->set_avg(avg());
   wave_canvas->setArea(channels.get());
 
   float* processed_data = new float[data_size];
@@ -366,23 +382,23 @@ int main(int argc, char** argv) {
     auto first_layout = new Widget(screen);
     first_layout->set_layout(new BoxLayout(Orientation::Vertical,
                                        Alignment::Middle, 0, 6));
-    audio_stats = new Label(first_layout, "");
-    audio_stats->set_fixed_size({stats_width, first_column_height / 2});
-    
+    {
+      audio_stats = new Label(first_layout, "");
+      audio_stats->set_fixed_size({stats_width, first_column_height / 2});
 
-    auto b_load = new Button(first_layout, "Load");
-    b_load->set_fixed_size({75, 30});
-    b_load->set_callback([&] {
-        loadfile(file_dialog({ {"ogg", "Vorbis ogg"} }, false).c_str());
-    });
-    auto b_play = new Button(first_layout, "Play");
-    b_play->set_fixed_size({75, 30});
-    b_play->set_callback([&] {
-      play_flag = !play_flag; 
-      played_track = 0;
-      b_play->set_caption(!play_flag ? "Play" : "Pause");
-      } );
-
+      auto b_load = new Button(first_layout, "Load");
+      b_load->set_fixed_size({75, 30});
+      b_load->set_callback([&] {
+          loadfile(file_dialog({ {"ogg", "Vorbis ogg"} }, false).c_str());
+      });
+      auto b_play = new Button(first_layout, "Play");
+      b_play->set_fixed_size({75, 30});
+      b_play->set_callback([&] {
+        play_flag = !play_flag; 
+        played_track = 0;
+        b_play->set_caption(!play_flag ? "Play" : "Pause");
+        } );
+    }
     first_layout->set_position({10,10});
     first_layout->set_fixed_size({stats_width, first_column_height});
     first_layout->set_visible(true);
@@ -390,23 +406,51 @@ int main(int argc, char** argv) {
     auto second_layout = new Widget(screen);
     second_layout->set_layout(new BoxLayout(Orientation::Vertical,
                                     Alignment::Middle, 0, 6));
-
-    auto b_process = new Button(second_layout, "Process");
-    b_process->set_fixed_size({75, 30});
-    b_process->set_callback([&] {
-      for (int i = 0; i < channels[0].step; ++i)
-        process(channels[i], channels_processed[i]);
-      processed_canvas->setArea(channels_processed.get());
-      savefile();
-    });
-    auto b_play_s = new Button(second_layout, "Play");
-    b_play_s->set_fixed_size({75, 30});
-    b_play_s->set_callback([&] {
-      play_flag = !play_flag;
-      played_track = 1;
-      b_play_s->set_caption(!play_flag ? "Play" : "Pause");
-      } );
-    
+    {
+      auto cb = new ComboBox(second_layout, { "Мужской вокал", "Женский вокал" });
+      cb->set_callback([&](int index){
+          if (index == 0)
+            target_freq = 12500;
+          else
+            target_freq = 13500;
+      });
+      auto lb = new Label(second_layout, fmt::format("Интенсивность: {:.3}", intensity));
+      auto intensity_sl = new Slider(second_layout);
+      intensity_sl->set_range( {2, 10} );
+      intensity_sl->set_value(intensity);
+      intensity_sl->set_callback([&](float val){
+        intensity = val;
+        lb->set_caption(fmt::format("Интенсивность: {:.3}", val));
+      });
+      auto lb_2 = new Label(second_layout, fmt::format("Смещение: {:.5}", user_avg_thresh));
+      auto user_thresh_sl = new Slider(second_layout);
+      user_thresh_sl->set_range( {-0.1, 0.1} );
+      user_thresh_sl->set_fixed_width( 200 );
+      user_thresh_sl->set_value(user_avg_thresh);
+      user_thresh_sl->set_callback([&](float val){
+        user_avg_thresh = val;
+        lb_2->set_caption(fmt::format("Смещение: {:.5}", user_avg_thresh));
+        wave_canvas->set_avg(avg());
+      });
+      auto b_process = new Button(second_layout, "Process");
+      b_process->set_fixed_size({75, 30});
+      b_process->set_callback([&] {
+        for (int i = 0; i < channels[0].step; ++i){
+          channels[i].ptr = channels[i].start;
+          channels_processed[i].ptr = channels_processed[i].start;
+          process(channels[i], channels_processed[i]);
+        }
+        processed_canvas->setArea(channels_processed.get());
+        savefile();
+      });
+      auto b_play_s = new Button(second_layout, "Play");
+      b_play_s->set_fixed_size({75, 30});
+      b_play_s->set_callback([&] {
+        play_flag = !play_flag;
+        played_track = 1;
+        b_play_s->set_caption(!play_flag ? "Play" : "Pause");
+        } );
+    }
     second_layout->set_position({10, first_column_height + 10 + 10});
     second_layout->set_fixed_size({stats_width, first_column_height});
     second_layout->set_visible(true);

@@ -175,17 +175,25 @@ public:
 
         
         Area area = *wave;
+        area.ptr = area.start;
 
         int i = 0;
         float color_bef[col_size * 2 * 1] = {1, 0, 0, 1, 0, 0};
         float color_aft[col_size * 2 * 1] = {0, 1, 0, 0, 1, 0};
+        float color_avg[col_size * 2 * 1] = {0, 0, 1, 0, 0, 1};
         while(i * 6 < col_size * 2 * count) {
             int index = i * 6;
+            float avg = std::abs(*(area) - *(area + 1)) / 2;
+            area += 1;
 
             if(i * 6 < col_size * 2 * progress)
                 memcpy((void*)(colors + index), (void*)&color_aft, 6*sizeof(float));
-            else
-                memcpy((void*)(colors + index), (void*)&color_bef, 6*sizeof(float));
+            else {
+                if(avg > user_avg)
+                    memcpy((void*)(colors + index), (void*)&color_avg, 6*sizeof(float));
+                else
+                    memcpy((void*)(colors + index), (void*)&color_bef, 6*sizeof(float));
+            }
             ++i;
         }
 
@@ -203,11 +211,16 @@ public:
         progress = count - n;
     }
 
+    void set_avg(float avg_) {
+        user_avg = avg_;
+    }
+
 private:
     nanogui::ref<nanogui::Shader> m_shader = nullptr;
     Area *wave = nullptr;
     int count;
     int progress;
+    float user_avg = 1.f;
     float *colors;
 
     static constexpr int col_size = 3;
