@@ -3,6 +3,8 @@ DeEsser
 
 Audio processing for getting rid of excessive prominence of sibilant consonants.
 
+![Screenshot of program](assets/screenshot.jpg)
+
 ## Build
 
 ```
@@ -29,5 +31,6 @@ make # your build command dependent on platform
  3. [X] Streaming audio data to speakers through (libsoundio)
  4. [X] Rendering data like waveform, audio specs, playback control (nanogui)
  5. [X] Audio processing, fft -> suppress frequencies -> ifft
- 6. [ ] Some tuning? Gauss?
- 7. [X] Saving to ogg file (vorbis + ogg codec)
+ 6. [X] By average peeks finding
+ 7. [X] Interface to tune settings
+ 8. [X] Saving to ogg file (vorbis + ogg codec)
