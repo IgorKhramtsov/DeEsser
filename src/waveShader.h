@@ -5,7 +5,7 @@
 #include "Area.h"
 #include "audio_processing.h"
 
-// constexpr float Pi = 3.14159f;
+float calcAvg(Area &data, int length);
 
 // Abstract class, dont use it directly
 class ZoomingCanvas : public nanogui::Canvas {

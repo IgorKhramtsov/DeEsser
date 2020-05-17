@@ -80,6 +80,30 @@ float getAvg(Area data)
   return summ / count;
 }
 
+float calcAvg(Area &data, int length)
+{
+  float summ = 0;
+  for (int i = 0; i < length - 1; ++i) {
+    summ += *(data + i + 1) - *(data + i);
+  }
+  return summ / 9;
+}
+
+void createMask(Area data, float thresh) 
+{
+  bool *mask = new bool[data.size()];
+  bool *maskptr = mask;
+  while(data.ptr < data.end) {
+    auto locDiffAvg = calcAvg(data, 10);
+    data += 10;
+
+    if ( locDiffAvg > thresh)
+      *maskptr++ = true;
+    else
+      *maskptr++ = false;
+  }
+}
+
 // TODO: Coefficients of this filter should be precalculated
 //        and stored in memory as array
 void filter(CArray &arr, int buffer_size) 
@@ -111,7 +135,7 @@ void process(Area in_data, Area out_data)
 {
   constexpr int buffer_size = 4096;
   float avg = getAvg(in_data);
-
+  out_data += buffer_size / 3;
   // fill out_data by buffer of buffer_size while have in_data
   while(in_data.ptr < in_data.end + buffer_size / 2 && out_data.ptr != out_data.end) {
     auto complex = std::make_unique<Complex[]>(buffer_size);
@@ -177,7 +201,7 @@ void loadfile(const char *filename)
   wave_canvas->setArea(channels.get());
 
   float* processed_data = new float[data_size];
-  // memcpy(processed_data, f_data, sizeof(float) * data_size);
+  memcpy(processed_data, f_data, sizeof(float) * data_size);
   channels_processed = std::make_unique<Area[]>(num_channels);
   for (int i = 0; i < num_channels; ++i) {
     channels_processed[i] = Area(processed_data + i, num_samples + i, num_channels);
