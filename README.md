@@ -5,6 +5,12 @@ Audio processing for getting rid of excessive prominence of sibilant consonants.
 
 ![Screenshot of program](assets/screenshot.jpg)
 
+## Algoritgm
+Algorithm searches for excessive sibilants in audio by counting number of zero crossing in each area and
+apply filter on areas, where counted number is greater than certain constant. Filter itself is converting
+each area by Fast Fourier Transform, then suppress intensity of frequincies above certain threshold and
+converting signal back by Inverse Fast Fouriers Transform.
+
 ## Build
 
 ```
